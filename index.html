@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#07131b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Zekeringplanner">
+  <title>Zekeringplanner</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="map-bg" aria-hidden="true">
+    <i class="road a"></i><i class="road b"></i><i class="road c"></i><i class="road d"></i>
+    <i class="water"></i><i class="pulse p1"></i><i class="pulse p2"></i>
+  </div>
+
+  <header class="topbar">
+    <div class="brand"><span class="brandmark">›</span><div><b>ZEKERING</b><small>PLANNER</small></div></div>
+    <div class="header-actions">
+      <button id="themeBtn" class="iconbtn" title="Licht/donker">☼</button>
+      <button id="settingsBtn" class="iconbtn" title="Instellingen">⚙</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="eyebrow"><span class="dot"></span> Werklijst + POI-locaties</div>
+      <h1>Plan open zekeringwissels rondom één station.</h1>
+      <p class="sub">De Excel blijft lokaal op dit apparaat. Alleen de bestaande POI-bron wordt online opgehaald.</p>
+
+      <div class="importbar">
+        <label class="filebtn primary">
+          <input id="excelFile" type="file" accept=".xlsx,.xlsm" hidden>
+          <span>↥</span> Excel kiezen
+        </label>
+        <button id="reimportBtn" class="filebtn secondary hidden">↻ Andere Excel</button>
+        <div id="fileInfo" class="fileinfo">Nog geen werklijst geladen</div>
+      </div>
+
+      <div id="summaryChips" class="chips hidden"></div>
+    </section>
+
+    <section class="sheet">
+      <div class="grab"></div>
+
+      <section class="panel start-panel">
+        <div class="panel-head">
+          <div><span class="step">1</span><h2>Kies startstation</h2></div>
+          <button id="geoBtn" class="smallbtn">◎ Mijn locatie</button>
+        </div>
+        <div class="searchbox">
+          <span>⌕</span>
+          <input id="stationSearch" type="search" autocomplete="off" placeholder="Station, kastnummer, naam of plaats…">
+          <button id="clearStation">×</button>
+        </div>
+        <div id="suggestions" class="suggestions hidden"></div>
+        <div id="selectedStart" class="selected-start empty">Nog geen startpunt gekozen.</div>
+      </section>
+
+      <section class="panel controls-panel">
+        <div class="panel-head"><div><span class="step">2</span><h2>Omgeving</h2></div></div>
+        <div class="control-grid">
+          <label>Straal
+            <select id="radius">
+              <option value="2">2 km</option><option value="5">5 km</option><option value="10" selected>10 km</option>
+              <option value="15">15 km</option><option value="20">20 km</option><option value="30">30 km</option><option value="50">50 km</option>
+            </select>
+          </label>
+          <label>Max. stations
+            <select id="maxStations">
+              <option value="10">10</option><option value="20" selected>20</option><option value="30">30</option><option value="50">50</option><option value="999">Alles</option>
+            </select>
+          </label>
+        </div>
+        <label class="toggle-row"><input id="includeAction" type="checkbox"><span></span><div><b>Gele regels meenemen</b><small>Actie nodig wordt standaard alleen als waarschuwing getoond.</small></div></label>
+        <button id="planBtn" class="planbtn" disabled>Maak lijst in de buurt</button>
+      </section>
+
+      <section id="resultsSection" class="panel hidden">
+        <div class="result-title"><div><span class="step">3</span><h2>Stations</h2></div><span id="resultCount" class="muted"></span></div>
+        <div id="stationResults" class="station-list"></div>
+      </section>
+
+      <section id="actionsSection" class="panel hidden">
+        <div class="result-title"><div><span class="step action-step">!</span><h2>Actie nodig in de buurt</h2></div><span id="actionCount" class="muted"></span></div>
+        <p class="note">Gele regels worden niet in de boodschappenlijst meegenomen, tenzij je bovenaan “Gele regels meenemen” inschakelt.</p>
+        <div id="actionResults" class="station-list"></div>
+      </section>
+
+      <section id="shoppingSection" class="panel shopping hidden">
+        <div class="result-title"><div><span class="step">4</span><h2>Boodschappenlijst</h2></div><button id="copyShopping" class="smallbtn">⧉ Kopieer</button></div>
+        <div id="shoppingList" class="shopping-list"></div>
+        <p id="shoppingNote" class="note"></p>
+      </section>
+
+      <section id="unmatchedSection" class="panel hidden">
+        <details>
+          <summary><b>Niet gekoppelde stations</b> <span id="unmatchedCount" class="muted"></span></summary>
+          <div id="unmatchedList" class="unmatched"></div>
+        </details>
+      </section>
+    </section>
+  </main>
+
+  <dialog id="settingsDlg">
+    <button class="close" data-close="settingsDlg">×</button>
+    <h2>Instellingen</h2>
+    <label>Zekeringen per richting
+      <input id="defaultQty" type="number" min="1" max="12" step="1" value="3">
+      <small>Wordt alleen gebruikt als de Excel geen kolom met aantal/stuks bevat.</small>
+    </label>
+    <label>Weergave
+      <select id="themePref"><option value="dark">Donker</option><option value="light">Licht</option><option value="system">Automatisch</option></select>
+    </label>
+    <button id="mappingBtn" class="widebtn">Excel-kolommen aanpassen</button>
+    <button id="clearDataBtn" class="widebtn danger">Lokale werklijst wissen</button>
+    <p class="version">Versie 0.2</p>
+  </dialog>
+
+  <dialog id="mappingDlg">
+    <button class="close" data-close="mappingDlg">×</button>
+    <h2>Excel-kolommen</h2>
+    <p class="modaltext">Controleer welke kolommen gebruikt moeten worden. De status mag leeg blijven als groen/geel via celkleur wordt bepaald.</p>
+    <label>Werkblad<select id="sheetSelect"></select></label>
+    <label>Headerregel<input id="headerRow" type="number" min="1" value="1"></label>
+    <label>Station<select id="stationCol"></select></label>
+    <label>Richting<select id="directionCol"></select></label>
+    <label>Zekeringwaarde<select id="fuseCol"></select></label>
+    <label>Aantal / stuks<select id="qtyCol"></select></label>
+    <label>Status / opmerking<select id="statusCol"></select></label>
+    <button id="applyMapping" class="planbtn">Toepassen</button>
+  </dialog>
+
+  <div id="toast"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js" crossorigin="anonymous"></script>
+  <script src="app.js"></script>
+</body>
+</html>
