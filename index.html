@@ -28,7 +28,7 @@
     <section class="hero">
       <div class="eyebrow"><span class="dot"></span> Werklijst + POI-locaties</div>
       <h1>Plan open zekeringwissels rondom één station.</h1>
-      <p class="sub">De Excel blijft lokaal op dit apparaat. Alleen de bestaande POI-bron wordt online opgehaald.</p>
+      <p class="sub">De Excel blijft lokaal op dit apparaat. Kleuren, opmerkingen en gereedmeldingen worden automatisch herkend.</p>
 
       <div class="importbar">
         <label class="filebtn primary">
@@ -74,7 +74,7 @@
             </select>
           </label>
         </div>
-        <label class="toggle-row"><input id="includeAction" type="checkbox"><span></span><div><b>Gele regels meenemen</b><small>Actie nodig wordt standaard alleen als waarschuwing getoond.</small></div></label>
+        <label class="toggle-row"><input id="includeAction" type="checkbox"><span></span><div><b>Gele regels toch opnieuw meenemen</b><small>Geel betekent: niet kunnen wisselen. Standaard apart tonen + mail Kevin.</small></div></label>
         <button id="planBtn" class="planbtn" disabled>Maak lijst in de buurt</button>
       </section>
 
@@ -85,14 +85,35 @@
 
       <section id="actionsSection" class="panel hidden">
         <div class="result-title"><div><span class="step action-step">!</span><h2>Actie nodig in de buurt</h2></div><span id="actionCount" class="muted"></span></div>
-        <p class="note">Gele regels worden niet in de boodschappenlijst meegenomen, tenzij je bovenaan “Gele regels meenemen” inschakelt.</p>
+        <p class="note"><b>Geel = niet kunnen wisselen.</b> De opmerking van jullie staat erbij. Vergeet niet Kevin te mailen; de app kan de mailtekst alvast maken.</p>
         <div id="actionResults" class="station-list"></div>
+      </section>
+
+
+      <section id="engineeringSection" class="panel hidden">
+        <div class="result-title"><div><span class="step engineering-step">E</span><h2>Engineering</h2></div><span id="engineeringCount" class="muted"></span></div>
+        <p class="note">Oranje regels bevatten een Engineering-opmerking, meestal een verzwaring of vermindering. Ze worden niet automatisch in de boodschappenlijst meegenomen.</p>
+        <div id="engineeringResults" class="station-list"></div>
+      </section>
+
+      <section id="maintenanceSection" class="panel hidden">
+        <div class="result-title"><div><span class="step maintenance-step">H</span><h2>Onderhoud — Henri</h2></div><span id="maintenanceCount" class="muted"></span></div>
+        <p class="note">Blauwe regels worden door Henri van der Vleuten tijdens onderhoud opgepakt en blijven buiten jouw normale route en boodschappenlijst.</p>
+        <div id="maintenanceResults" class="station-list"></div>
       </section>
 
       <section id="shoppingSection" class="panel shopping hidden">
         <div class="result-title"><div><span class="step">4</span><h2>Boodschappenlijst</h2></div><button id="copyShopping" class="smallbtn">⧉ Kopieer</button></div>
         <div id="shoppingList" class="shopping-list"></div>
         <p id="shoppingNote" class="note"></p>
+      </section>
+
+
+      <section id="completedSection" class="panel completed-panel">
+        <div class="result-title"><div><span class="step completed-step">✓</span><h2>Uitgevoerd</h2><span id="completedCount" class="muted"></span></div><div class="completed-actions"><select id="completedFilter"><option value="today">Vandaag</option><option value="all">Alles</option></select><button id="copyCompleted" class="smallbtn">⧉ Kopieer</button></div></div>
+        <div id="completedSummary" class="completed-summary"></div>
+        <div id="completedList" class="completed-list"></div>
+        <p class="note">Afvinken wordt alleen lokaal op dit apparaat opgeslagen; de SharePoint-Excel wordt niet aangepast.</p>
       </section>
 
       <section id="unmatchedSection" class="panel hidden">
@@ -111,25 +132,29 @@
       <input id="defaultQty" type="number" min="1" max="12" step="1" value="3">
       <small>Wordt alleen gebruikt als de Excel geen kolom met aantal/stuks bevat.</small>
     </label>
+    <label>Kevin e-mailadres (optioneel)
+      <input id="kevinEmail" type="email" autocomplete="email" placeholder="Vul in als je de mailknop direct wilt adresseren">
+      <small>Leeg laten kan ook; dan opent een nieuwe mail zonder ontvanger.</small>
+    </label>
     <label>Weergave
       <select id="themePref"><option value="dark">Donker</option><option value="light">Licht</option><option value="system">Automatisch</option></select>
     </label>
     <button id="mappingBtn" class="widebtn">Excel-kolommen aanpassen</button>
     <button id="clearDataBtn" class="widebtn danger">Lokale werklijst wissen</button>
-    <p class="version">Versie 0.2</p>
+    <button id="clearCompletedBtn" class="widebtn danger">Afvinkhistorie wissen</button>
+    <p class="version">Versie 0.3</p>
   </dialog>
 
   <dialog id="mappingDlg">
     <button class="close" data-close="mappingDlg">×</button>
     <h2>Excel-kolommen</h2>
-    <p class="modaltext">Controleer welke kolommen gebruikt moeten worden. De status mag leeg blijven als groen/geel via celkleur wordt bepaald.</p>
+    <p class="modaltext">Controleer de hoofdkolommen. Groen/geel/oranje/blauw, medewerker, Engineering- en specialisme-opmerkingen worden automatisch uit de actuele Enexis-lijst gelezen.</p>
     <label>Werkblad<select id="sheetSelect"></select></label>
     <label>Headerregel<input id="headerRow" type="number" min="1" value="1"></label>
     <label>Station<select id="stationCol"></select></label>
     <label>Richting<select id="directionCol"></select></label>
     <label>Zekeringwaarde<select id="fuseCol"></select></label>
     <label>Aantal / stuks<select id="qtyCol"></select></label>
-    <label>Status / opmerking<select id="statusCol"></select></label>
     <button id="applyMapping" class="planbtn">Toepassen</button>
   </dialog>
 

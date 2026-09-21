@@ -1,51 +1,51 @@
-ZEKERINGPLANNER v0.2
+ZEKERINGPLANNER v0.3
 ====================
 
-Doel
-----
-Webapp om op basis van de GFF-zekeringwissellijst de resterende werkzaamheden rond een gekozen station/verdeelkast te plannen.
+GitHub Pages-ready webapp voor de Enexis GFF-zekeringwissellijst.
 
-Specifiek afgestemd op GFF_zekeringwissel_20251229.xlsx
-------------------------------------------------------
-Werkblad: data
-- G: te wisselen station
-- H: LS_VELDNUMMER (richting)
-- I: LS_SMELTVEILIGHEID_INOM (zekeringwaarde)
-- J: opmerking
+WERKING
+- Importeer de actuele GFF_zekeringwissel_20251229.xlsx lokaal in de browser.
+- De app kiest automatisch werkblad "data" en herkent de huidige kolommen:
+  D = Netstation/LS-kast
+  F = Huidige waarde
+  G = LS Veldnummer
+  I = Opmerking specialisme
+  J = Opmerkingen vanuit Engineering
+  K = Zekering vervangen medewerker
+- Locaties worden gekoppeld aan de bestaande Enexis POI-bronnen voor stations en verdeelkasten.
 
-Status
-------
-- Groen = gereed, wordt altijd uitgesloten.
-- Geel = actie nodig, standaard apart getoond en niet meegenomen in de boodschappenlijst.
-- Geen kleur / wit = open.
+STATUSSEN
+- Wit / geen kleur + geen medewerker: open, normaal uitvoeren.
+- Groen OF een naam in "Zekering vervangen medewerker": gereed, niet meenemen.
+- Geel: niet kunnen wisselen; opmerking specialisme tonen + herinnering "Mail Kevin".
+- Oranje: Engineering-opmerking (vaak verzwaring/vermindering); apart tonen, niet automatisch meenemen.
+- Blauw: wordt opgepakt door Henri van der Vleuten tijdens onderhoud; apart tonen.
 
-De aangeleverde versie van het bestand bevatte bij analyse:
-- 271 open regels
-- 31 gele actie-regels
-- 235 groene/gereed-regels
-- 335 unieke wissellocaties
+AFVINKEN
+- Iedere normale open richting heeft een knop "Gedaan".
+- Afgevinkte regels verdwijnen direct uit de route en boodschappenlijst.
+- Ze worden lokaal opgeslagen in de browser en verschijnen onder "Uitgevoerd".
+- Het overzicht kan op Vandaag of Alles worden gezet en gekopieerd worden.
+- Met "Herstel" kan een foutieve afvinking worden teruggedraaid.
+- Dit schrijft NIET terug naar SharePoint/Excel.
 
-POI-koppeling
--------------
-De app leest zowel poi_e_station.csv als poi_e_verdeelkast.csv uit de bestaande POI-zoeker. Daardoor kunnen ook SK/VK-locaties worden gekoppeld.
+BOODSCHAPPENLIJST
+- Standaard 3 zekeringen per richting (aanpasbaar in Instellingen).
+- Restbak/onbekende waarden worden niet als zekeringtype opgeteld maar als controlepunt gemeld.
+- Geel, Engineering, Henri en afgevinkte regels tellen standaard niet mee.
 
-Privacy
--------
-De Excel wordt alleen lokaal in de browser ingelezen en opgeslagen in localStorage. De werklijst wordt NIET naar GitHub verstuurd. Dit is bewust zo gedaan omdat de huidige GitHub Pages-repository publiek is.
+MAIL KEVIN
+- Bij gele regels staat een knop "Maak mail".
+- In Instellingen kan optioneel Kevins e-mailadres worden ingevuld.
+- Zonder e-mailadres opent de mailapp met onderwerp en tekst maar zonder ontvanger.
 
-Gebruik
--------
-1. Open index.html via GitHub Pages/een webserver.
-2. Kies de Excel. Eenmaal ingelezen blijft de verwerkte lijst lokaal op dat apparaat staan.
-3. Kies een startstation/verdeelkast of gebruik Mijn locatie.
-4. Kies straal en maximaal aantal locaties.
-5. Klik “Maak lijst in de buurt”.
-6. Onder Stations zie je open richtingen; Actie nodig toont geel; Boodschappenlijst telt benodigde zekeringen.
+PRIVACY
+- Excel-data wordt alleen in de browser verwerkt en lokaal opgeslagen.
+- Zet de Excel NIET in een publieke GitHub-repository.
+- Alleen de POI-bronnen worden online opgehaald.
 
-Aantal zekeringen
------------------
-De Excel bevat geen aantalkolom. Standaard rekent de app daarom met 3 zekeringen per richting (3 fasen). Dit is aanpasbaar onder Instellingen.
-
-Opmerking over SharePoint
--------------------------
-Een publieke GitHub Pages-app kan het beveiligde SharePoint-bestand niet betrouwbaar rechtstreeks uitlezen zonder Microsoft/Entra-authenticatie en CORS-configuratie. Daarom is lokale import gebruikt. Voor live synchronisatie is een interne hosting of Entra-appregistratie nodig.
+INSTALLATIE GITHUB PAGES
+1. Upload index.html, app.js, styles.css, manifest.webmanifest en README.txt naar een repository.
+2. Settings > Pages > Deploy from a branch > main / root.
+3. Open de GitHub Pages-link.
+4. Op iPhone: Safari > Deel > Zet op beginscherm.
