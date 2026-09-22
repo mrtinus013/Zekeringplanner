@@ -13,7 +13,7 @@
 <body>
   <div class="map-bg" aria-hidden="true">
     <i class="road a"></i><i class="road b"></i><i class="road c"></i><i class="road d"></i>
-    <i class="water"></i><i class="pulse p1"></i><i class="pulse p2"></i>
+    <i class="water"></i>
   </div>
 
   <header class="topbar">
@@ -39,6 +39,7 @@
         <div id="fileInfo" class="fileinfo">Nog geen werklijst geladen</div>
       </div>
       <div id="summaryChips" class="chips hidden"></div>
+      <div class="poi-loadbar"><span id="poiStatus" class="poi-status">POI-locaties laden…</span><button id="retryPoiBtn" type="button" class="smallbtn hidden">↻ Opnieuw laden</button></div>
     </section>
 
     <section class="sheet">
@@ -60,11 +61,17 @@
 
       <section class="panel controls-panel">
         <div class="panel-head"><div><span class="step">2</span><h2>Zoek in de omgeving</h2></div></div>
-        <div class="control-grid one-control">
+        <div class="control-grid">
           <label>Straal
             <select id="radius">
               <option value="2">2 km</option><option value="5">5 km</option><option value="10" selected>10 km</option>
               <option value="15">15 km</option><option value="20">20 km</option><option value="30">30 km</option><option value="50">50 km</option>
+            </select>
+          </label>
+          <label>Aantal resultaten
+            <select id="resultLimit">
+              <option value="10">10</option><option value="20" selected>20</option><option value="30">30</option>
+              <option value="50">50</option><option value="100">100</option><option value="all">Alles</option>
             </select>
           </label>
         </div>
@@ -154,7 +161,7 @@
     <button id="clearDataBtn" class="widebtn danger">Lokale werklijst wissen</button>
     <button id="clearCompletedBtn" class="widebtn danger">Afvinkhistorie wissen</button>
     <button id="clearSavedRouteBtn" class="widebtn danger">Opgeslagen route wissen</button>
-    <p class="version">Versie 0.4.1</p>
+    <p class="version">Versie 0.4.3</p>
   </dialog>
 
   <dialog id="mappingDlg">

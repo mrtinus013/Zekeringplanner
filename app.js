@@ -10,14 +10,41 @@ const $ = s => document.querySelector(s);
 const state = {
   poi:[], poiByCode:new Map(), rows:[], groups:[], start:null, workbook:null, currentSheet:null,
   mapping:null, nearbyCandidates:[], nearbyActions:[], nearbyEngineering:[], nearbyMaintenance:[],
-  routeDraft:[], routeOrder:[], routeFinalized:false, routeSnapshot:null, pendingFilename:'', completed:{}, searchDone:false
+  routeDraft:[], routeOrder:[], routeFinalized:false, routeSnapshot:null, pendingFilename:'', completed:{}, searchDone:false,
+  poiStatus:'idle', poiFailures:[]
 };
+
+function setPoiUi(status,text){
+  state.poiStatus=status;
+  const el=$('#poiStatus'),retry=$('#retryPoiBtn');
+  if(el){el.textContent=text||'';el.className='poi-status '+status}
+  if(retry)retry.classList.toggle('hidden',status!=='error');
+  syncSearchButton();
+}
+
+async function fetchPoiSource(file){
+  const urls=[
+    `https://raw.githubusercontent.com/POIenexis/POI-zoeker/main/${file}`,
+    `https://cdn.jsdelivr.net/gh/POIenexis/POI-zoeker@main/${file}`
+  ];
+  let lastErr=null;
+  for(const url of urls){
+    try{
+      const r=await fetch(url,{cache:'default'});
+      if(!r.ok)throw new Error(`HTTP ${r.status}`);
+      const text=await r.text();
+      if(!text||text.length<20)throw new Error('Lege POI-bron');
+      return {text,url};
+    }catch(e){lastErr=e}
+  }
+  throw lastErr||new Error('POI-bron niet bereikbaar');
+}
 
 function syncSearchButton(){
   const btn=$('#searchNearbyBtn');if(!btn)return;
   const hasRows=state.rows.length>0,hasPoi=state.poi.length>0,hasStart=!!state.start;
   btn.disabled=!(hasRows&&hasPoi&&hasStart);
-  btn.title=!hasRows?'Laad eerst de Excel':!hasPoi?'POI-locaties worden nog geladen':!hasStart?'Kies eerst je locatie of een station/postcode':'';
+  btn.title=!hasRows?'Laad eerst de Excel':!hasPoi?(state.poiStatus==='error'?'POI-data kon niet laden — druk op Opnieuw laden':'POI-locaties worden nog geladen'):!hasStart?'Kies eerst je locatie of een station/postcode':'';
 }
 
 function toast(t){const x=$('#toast');x.textContent=t;x.classList.add('show');clearTimeout(x._t);x._t=setTimeout(()=>x.classList.remove('show'),1900)}
@@ -39,20 +66,38 @@ function effectiveOpen(r){return r.status==='open'&&!isLocalDone(r)}
 function routeRows(g){return g.rows.filter(effectiveOpen)}
 
 async function loadPoi(){
-  if(!state.rows.length)$('#fileInfo').textContent='POI-locaties laden…';
+  setPoiUi('loading','POI-locaties laden…');
+  state.poiFailures=[];
   try{
-    const all=[];let failures=0;
-    await Promise.all(POI_SOURCES.map(async([url,type])=>{
+    const all=[];
+    for(const [legacyUrl,type] of POI_SOURCES){
+      const file=legacyUrl.split('/').pop();
       try{
-        const r=await fetch(url,{cache:'no-cache'});if(!r.ok)throw new Error(type);
-        const lines=(await r.text()).split(/\r?\n/).filter(Boolean),h=csvLine(lines.shift());
+        const {text}=await fetchPoiSource(file);
+        const lines=text.split(/\r?\n/).filter(Boolean),h=csvLine(lines.shift());
         const ni=h.findIndex(x=>/naam/i.test(x)),ai=h.findIndex(x=>/^(latitude|lat)$/i.test(x.trim())),oi=h.findIndex(x=>/^(longitude|lon)$/i.test(x.trim()));
-        for(const line of lines){const c=csvLine(line),lat=coord(c[ai],'lat'),lon=coord(c[oi],'lon');if(!isFinite(lat)||!isFinite(lon))continue;const raw=c[ni]||'',p=raw.split(',').map(x=>x.trim());all.push({type,raw,code:p[0]||'',name:p[1]||'',street:p[2]||'',house:p[3]||'',zip:p[4]||'',city:p[5]||'',lat,lon,search:norm(raw+' '+type)})}
-      }catch(e){failures++;console.error(e)}
-    }));
-    const unique=new Map();for(const i of all){const k=norm(i.code);if(!k)continue;if(!unique.has(k)||i.type==='Station')unique.set(k,i)}
-    state.poi=[...unique.values()];state.poiByCode=unique;rebuildGroups();updateSummary();restoreRouteAfterGroups();syncSearchButton();if(failures)toast('Een POI-bron kon niet laden');
-  }catch(e){toast('POI-data kon niet worden geladen');console.error(e);syncSearchButton()}
+        if(ni<0||ai<0||oi<0)throw new Error('Onverwachte POI-kolommen');
+        for(const line of lines){
+          const c=csvLine(line),lat=coord(c[ai],'lat'),lon=coord(c[oi],'lon');
+          if(!isFinite(lat)||!isFinite(lon))continue;
+          const raw=c[ni]||'',p=raw.split(',').map(x=>x.trim());
+          all.push({type,raw,code:p[0]||'',name:p[1]||'',street:p[2]||'',house:p[3]||'',zip:p[4]||'',city:p[5]||'',lat,lon,search:norm(raw+' '+type)});
+        }
+      }catch(e){state.poiFailures.push(`${type}: ${e?.message||e}`);console.error(type,e)}
+    }
+    if(!all.length)throw new Error('Geen POI-locaties ontvangen');
+    const unique=new Map();
+    for(const i of all){const k=norm(i.code);if(!k)continue;if(!unique.has(k)||i.type==='Station')unique.set(k,i)}
+    state.poi=[...unique.values()];state.poiByCode=unique;
+    rebuildGroups();updateSummary();restoreRouteAfterGroups();
+    const active=state.groups.filter(g=>g.open||g.action||g.engineering||g.maintenance),matched=active.filter(g=>g.poi).length;
+    setPoiUi('ready',`POI klaar · ${state.poi.length.toLocaleString('nl-NL')} locaties · ${matched}/${active.length} werklocaties gekoppeld`);
+    if(state.poiFailures.length)toast('POI geladen via reservebron');
+  }catch(e){
+    state.poi=[];state.poiByCode=new Map();rebuildGroups();updateSummary();
+    setPoiUi('error','POI-data niet geladen — tik op Opnieuw laden');
+    toast('POI-data kon niet worden geladen');console.error(e);
+  }
 }
 
 function fillStatus(cell){
@@ -152,7 +197,12 @@ function searchNearby(){
   if(!state.nearbyCandidates.length)toast('Geen normale open wissels binnen deze straal')
 }
 function renderNearby(){
-  const groups=state.nearbyCandidates;$('#resultsSection').classList.toggle('hidden',!state.searchDone);$('#routeBuilderSection').classList.toggle('hidden',!state.searchDone);$('#resultCount').textContent=`${groups.length} locatie${groups.length===1?'':'s'}`;
+  const allGroups=state.nearbyCandidates;
+  const limitValue=$('#resultLimit')?.value||'20';
+  const limit=limitValue==='all'?allGroups.length:Math.max(1,Number(limitValue)||20);
+  const groups=allGroups.slice(0,limit);
+  $('#resultsSection').classList.toggle('hidden',!state.searchDone);$('#routeBuilderSection').classList.toggle('hidden',!state.searchDone);
+  $('#resultCount').textContent=allGroups.length?(groups.length<allGroups.length?`${groups.length} van ${allGroups.length} locaties`:`${allGroups.length} locatie${allGroups.length===1?'':'s'}`):'0 locaties';
   $('#stationResults').innerHTML=groups.length?groups.map(g=>{const selected=isSelected(g.key);return `<article class="station-card candidate-card ${selected?'selected-candidate':''}"><div class="station-top"><div><div class="station-code">${esc(g.poi.code||g.station)}</div><div class="station-name">${esc(g.poi.type)} · ${esc(g.poi.name||'')} · ${esc(g.poi.city||'')}</div></div><div class="distance">${distanceLabel(g.dist)}</div></div><div class="candidate-fuses">${esc(fuseSummary(g))}</div><div class="candidate-meta">${routeRows(g).length} richting${routeRows(g).length===1?'':'en'} open</div><div class="station-actions"><button type="button" class="route-toggle ${selected?'remove':''}" data-group="${esc(g.key)}">${selected?'✓ In route — verwijder':'＋ Voeg toe aan route'}</button><a class="navlink" target="_blank" rel="noopener" href="${navUrl(g.poi)}">↗ Bekijk locatie</a></div></article>`}).join(''):'<div class="muted">Geen open wissels gevonden.</div>';
   $('#stationResults').querySelectorAll('.route-toggle').forEach(b=>b.addEventListener('click',()=>toggleRouteGroup(b.dataset.group)));renderRouteBuilder();
 }
@@ -247,8 +297,9 @@ function applyTheme(v){const r=v==='system'?(matchMedia('(prefers-color-scheme: 
 function loadLocal(){try{state.rows=JSON.parse(localStorage.getItem(LS.rows)||'[]');state.mapping=JSON.parse(localStorage.getItem(LS.mapping)||'null')}catch{state.rows=[]}loadCompleted();loadRouteState();rebuildGroups();updateSummary();const s=getSettings();$('#defaultQty').value=s.defaultQty;$('#themePref').value=s.theme;$('#kevinEmail').value=s.kevinEmail||'';applyTheme(s.theme);syncSearchButton();renderCompleted();restoreRouteAfterGroups()}
 
 $('#excelFile').onchange=e=>{const f=e.target.files?.[0];if(f)importFile(f)};
+$('#retryPoiBtn')?.addEventListener('click',()=>loadPoi());
 $('#reimportBtn').onclick=()=>$('#excelFile').click();
-$('#stationSearch').oninput=renderSuggestions;$('#stationSearch').addEventListener('keydown',e=>{if(e.key!=='Enter')return;const a=searchPoi($('#stationSearch').value.trim());if(a.length){e.preventDefault();selectStart(a[0])}});$('#clearStation').onclick=()=>{$('#stationSearch').value='';renderSuggestions()};$('#geoBtn').onclick=useGeo;$('#searchNearbyBtn').onclick=searchNearby;$('#radius').onchange=()=>state.start&&state.rows.length&&state.poi.length&&searchNearby();
+$('#stationSearch').oninput=renderSuggestions;$('#stationSearch').addEventListener('keydown',e=>{if(e.key!=='Enter')return;const a=searchPoi($('#stationSearch').value.trim());if(a.length){e.preventDefault();selectStart(a[0])}});$('#clearStation').onclick=()=>{$('#stationSearch').value='';renderSuggestions()};$('#geoBtn').onclick=useGeo;$('#searchNearbyBtn').onclick=searchNearby;$('#radius').onchange=()=>state.start&&state.rows.length&&state.poi.length&&searchNearby();$('#resultLimit').onchange=()=>state.searchDone&&renderNearby();
 $('#optimizeRouteBtn').onclick=optimizeRoute;$('#reoptimizeBtn').onclick=optimizeRoute;$('#clearRouteBtn').onclick=clearRoute;
 $('#copyShopping').onclick=async()=>{try{await navigator.clipboard.writeText(shoppingText());toast('Zekeringlijst gekopieerd')}catch{toast('Kopiëren niet gelukt')}};
 $('#copyCompleted').onclick=async()=>{try{await navigator.clipboard.writeText(completedText());toast('Uitgevoerd-overzicht gekopieerd')}catch{toast('Kopiëren niet gelukt')}};$('#completedFilter').onchange=renderCompleted;
