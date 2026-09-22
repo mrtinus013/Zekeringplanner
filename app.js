@@ -13,6 +13,13 @@ const state = {
   routeDraft:[], routeOrder:[], routeFinalized:false, routeSnapshot:null, pendingFilename:'', completed:{}, searchDone:false
 };
 
+function syncSearchButton(){
+  const btn=$('#searchNearbyBtn');if(!btn)return;
+  const hasRows=state.rows.length>0,hasPoi=state.poi.length>0,hasStart=!!state.start;
+  btn.disabled=!(hasRows&&hasPoi&&hasStart);
+  btn.title=!hasRows?'Laad eerst de Excel':!hasPoi?'POI-locaties worden nog geladen':!hasStart?'Kies eerst je locatie of een station/postcode':'';
+}
+
 function toast(t){const x=$('#toast');x.textContent=t;x.classList.add('show');clearTimeout(x._t);x._t=setTimeout(()=>x.classList.remove('show'),1900)}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function norm(s){return String(s??'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'')}
@@ -44,8 +51,8 @@ async function loadPoi(){
       }catch(e){failures++;console.error(e)}
     }));
     const unique=new Map();for(const i of all){const k=norm(i.code);if(!k)continue;if(!unique.has(k)||i.type==='Station')unique.set(k,i)}
-    state.poi=[...unique.values()];state.poiByCode=unique;rebuildGroups();updateSummary();restoreRouteAfterGroups();if(failures)toast('Een POI-bron kon niet laden');
-  }catch(e){toast('POI-data kon niet worden geladen');console.error(e)}
+    state.poi=[...unique.values()];state.poiByCode=unique;rebuildGroups();updateSummary();restoreRouteAfterGroups();syncSearchButton();if(failures)toast('Een POI-bron kon niet laden');
+  }catch(e){toast('POI-data kon niet worden geladen');console.error(e);syncSearchButton()}
 }
 
 function fillStatus(cell){
@@ -110,7 +117,7 @@ async function importFile(file){
 }
 function applyParsedRows(ws,m,filename){
   const rows=parseWorksheet(ws,m);state.rows=rows;state.mapping=m;localStorage.setItem(LS.rows,JSON.stringify(rows));localStorage.setItem(LS.mapping,JSON.stringify(m));localStorage.setItem(LS.meta,JSON.stringify({filename:filename||JSON.parse(localStorage.getItem(LS.meta)||'{}').filename||'Excel',loadedAt:new Date().toISOString(),sheet:ws.name}));
-  rebuildGroups();updateSummary();renderCompleted();restoreRouteAfterGroups();if($('#mappingDlg').open)$('#mappingDlg').close();const c=statusCounts();toast(`${c.open} open · ${c.action} geel · ${c.engineering} engineering · ${c.maintenance} Henri · ${c.done} gereed`)
+  rebuildGroups();updateSummary();renderCompleted();restoreRouteAfterGroups();syncSearchButton();if($('#mappingDlg').open)$('#mappingDlg').close();const c=statusCounts();toast(`${c.open} open · ${c.action} geel · ${c.engineering} engineering · ${c.maintenance} Henri · ${c.done} gereed`)
 }
 function extractCode(s){const t=String(s||'').trim();const m=t.match(/\b\d{1,4}\.(?:(?:SK|VK)\s*)?\d+\b/i)||t.match(/\b\d{1,4}[.\-\s]\d{2,5}\b/);return m?m[0].replace(/\s/g,''):t.split(/[;,]/)[0].trim()}
 function matchPoi(station){const code=extractCode(station),k=norm(code);if(state.poiByCode.has(k))return state.poiByCode.get(k);const candidates=state.poi.filter(p=>norm(p.code).endsWith(k)||k.endsWith(norm(p.code)));if(candidates.length===1)return candidates[0];const digits=String(code).replace(/\D/g,'');if(digits){const same=state.poi.filter(p=>String(p.code).replace(/\D/g,'')===digits);if(same.length===1)return same[0]}return null}
@@ -127,8 +134,8 @@ function renderUnmatched(){const u=state.groups.filter(g=>(g.open||g.action||g.e
 
 function searchPoi(term){const q=norm(term);if(q.length<1)return [];return state.poi.map(p=>{let score=-1;const c=norm(p.code),n=norm(p.name),city=norm(p.city);if(c===q)score=100;if(c.startsWith(q))score=Math.max(score,80);if(c.includes(q))score=Math.max(score,65);if(n.startsWith(q))score=Math.max(score,55);if(n.includes(q)||city.includes(q)||p.search.includes(q))score=Math.max(score,35);return{p,score}}).filter(x=>x.score>=0).sort((a,b)=>b.score-a.score).slice(0,14).map(x=>x.p)}
 function renderSuggestions(){const term=$('#stationSearch').value.trim(),box=$('#suggestions');if(!term){box.classList.add('hidden');box.innerHTML='';return}const a=searchPoi(term);box.innerHTML=a.map((p,i)=>`<button class="suggestion" data-i="${i}"><div><code>${esc(p.code)}</code><b>${esc(p.name||p.type)}</b><small>${esc(p.type)} · ${esc([p.street,p.house,p.city].filter(Boolean).join(' '))}</small></div><span>›</span></button>`).join('')||'<div class="suggestion"><small>Geen locatie gevonden</small></div>';box.classList.remove('hidden');box.querySelectorAll('button').forEach((b,i)=>b.onclick=()=>selectStart(a[i]))}
-function selectStart(p,label){state.start={lat:p.lat,lon:p.lon,poi:p,label:label||`${p.code} ${p.name}`};$('#selectedStart').classList.remove('empty');$('#selectedStart').innerHTML=`<b>${esc(label||p.code+' '+p.name)}</b><small>${esc(p.type)} · ${esc([p.street,p.house,p.zip,p.city].filter(Boolean).join(' '))}</small>`;$('#suggestions').classList.add('hidden');$('#stationSearch').value='';$('#searchNearbyBtn').disabled=!state.rows.length}
-function useGeo(){if(!navigator.geolocation)return toast('Locatie niet beschikbaar');navigator.geolocation.getCurrentPosition(pos=>{state.start={lat:pos.coords.latitude,lon:pos.coords.longitude,poi:null,label:'Mijn locatie'};$('#selectedStart').classList.remove('empty');$('#selectedStart').innerHTML='<b>Mijn locatie</b><small>Zoek- en startpunt op basis van GPS</small>';$('#searchNearbyBtn').disabled=!state.rows.length;toast('Locatie actief')},()=>toast('Geef locatie-toegang in je browser'),{enableHighAccuracy:true,timeout:12000,maximumAge:60000})}
+function selectStart(p,label){state.start={lat:p.lat,lon:p.lon,poi:p,label:label||`${p.code} ${p.name}`};$('#selectedStart').classList.remove('empty');$('#selectedStart').innerHTML=`<b>${esc(label||p.code+' '+p.name)}</b><small>${esc(p.type)} · ${esc([p.street,p.house,p.zip,p.city].filter(Boolean).join(' '))}</small>`;$('#suggestions').classList.add('hidden');$('#stationSearch').value='';syncSearchButton()}
+function useGeo(){if(!navigator.geolocation)return toast('Locatie niet beschikbaar');navigator.geolocation.getCurrentPosition(pos=>{state.start={lat:pos.coords.latitude,lon:pos.coords.longitude,poi:null,label:'Mijn locatie'};$('#selectedStart').classList.remove('empty');$('#selectedStart').innerHTML='<b>Mijn locatie</b><small>Zoek- en startpunt op basis van GPS</small>';syncSearchButton();toast(state.poi.length?'Locatie actief':'Locatie actief · POI-data wordt nog geladen')},()=>toast('Geef locatie-toegang in je browser'),{enableHighAccuracy:true,timeout:12000,maximumAge:60000})}
 
 function distanceLabel(d){return d<1?Math.round(d*1000)+' m':d.toFixed(1)+' km'}
 function navUrl(p){return `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}`}
@@ -137,7 +144,7 @@ function fuseSummary(g){const rows=routeRows(g),m=new Map();for(const r of rows)
 function isSelected(key){return state.routeDraft.includes(key)}
 
 function searchNearby(){
-  if(!state.start)return toast('Kies eerst een zoekpunt');if(!state.rows.length)return toast('Laad eerst de Excel');
+  if(!state.start)return toast('Kies eerst een zoekpunt');if(!state.rows.length)return toast('Laad eerst de Excel');if(!state.poi.length)return toast('POI-locaties zijn nog niet geladen');
   const radius=Number($('#radius').value);
   const nearby=state.groups.filter(g=>g.poi&&(g.open||g.action||g.engineering||g.maintenance)).map(g=>Object.assign({},g,{dist:hav(state.start.lat,state.start.lon,g.poi.lat,g.poi.lon)})).filter(g=>g.dist<=radius).sort((a,b)=>a.dist-b.dist);
   state.nearbyCandidates=nearby.filter(g=>routeRows(g).length);state.nearbyActions=nearby.filter(g=>g.action>0).slice(0,100);state.nearbyEngineering=nearby.filter(g=>g.engineering>0).slice(0,100);state.nearbyMaintenance=nearby.filter(g=>g.maintenance>0).slice(0,100);state.searchDone=true;
@@ -227,7 +234,7 @@ function saveRouteState(){localStorage.setItem(LS.route,JSON.stringify({draft:st
 function loadRouteState(){try{const r=JSON.parse(localStorage.getItem(LS.route)||'null');if(!r)return;state.routeDraft=Array.isArray(r.draft)?r.draft:[];state.routeOrder=Array.isArray(r.order)?r.order:[];state.routeFinalized=!!r.finalized;state.routeSnapshot=r.snapshot||null;if(r.start&&Number.isFinite(r.start.lat)&&Number.isFinite(r.start.lon))state.start=r.start}catch{}}
 function restoreRouteAfterGroups(){
   const valid=new Set(state.groups.filter(g=>g.poi).map(g=>g.key));state.routeDraft=state.routeDraft.filter(k=>valid.has(k));state.routeOrder=state.routeOrder.filter(k=>valid.has(k));if(state.routeFinalized&&!state.routeOrder.length)state.routeFinalized=false;
-  if(state.start){$('#selectedStart').classList.remove('empty');$('#selectedStart').innerHTML=`<b>${esc(state.start.label||'Opgeslagen startpunt')}</b><small>Opgeslagen startpunt</small>`;$('#searchNearbyBtn').disabled=!state.rows.length}renderRouteBuilder();if(state.routeFinalized){renderRoute();renderShoppingSnapshot()}
+  if(state.start){$('#selectedStart').classList.remove('empty');$('#selectedStart').innerHTML=`<b>${esc(state.start.label||'Opgeslagen startpunt')}</b><small>Opgeslagen startpunt</small>`;syncSearchButton()}renderRouteBuilder();if(state.routeFinalized){renderRoute();renderShoppingSnapshot()}
 }
 function clearSavedRoute(){state.routeDraft=[];state.routeOrder=[];state.routeFinalized=false;state.routeSnapshot=null;localStorage.removeItem(LS.route);renderRouteBuilder();$('#routeSection').classList.add('hidden');$('#shoppingSection').classList.add('hidden');if(state.searchDone)renderNearby();toast('Opgeslagen route gewist')}
 
@@ -237,18 +244,18 @@ function prepareMappingForSheet(ws,headerRow,current){state.currentSheet=ws;$('#
 function mappingFromForm(){const base=detectMapping(state.workbook.getWorksheet($('#sheetSelect').value),Number($('#headerRow').value));return Object.assign(base,{sheet:$('#sheetSelect').value,headerRow:Number($('#headerRow').value),stationCol:Number($('#stationCol').value),directionCol:Number($('#directionCol').value),fuseCol:Number($('#fuseCol').value),qtyCol:Number($('#qtyCol').value)})}
 
 function applyTheme(v){const r=v==='system'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):v;document.body.classList.toggle('light',r==='light');document.querySelector('meta[name="theme-color"]')?.setAttribute('content',r==='light'?'#edf3f5':'#07131b');$('#themeBtn').textContent=r==='light'?'☾':'☼'}
-function loadLocal(){try{state.rows=JSON.parse(localStorage.getItem(LS.rows)||'[]');state.mapping=JSON.parse(localStorage.getItem(LS.mapping)||'null')}catch{state.rows=[]}loadCompleted();loadRouteState();rebuildGroups();updateSummary();const s=getSettings();$('#defaultQty').value=s.defaultQty;$('#themePref').value=s.theme;$('#kevinEmail').value=s.kevinEmail||'';applyTheme(s.theme);$('#searchNearbyBtn').disabled=!state.rows.length||!state.start;renderCompleted();restoreRouteAfterGroups()}
+function loadLocal(){try{state.rows=JSON.parse(localStorage.getItem(LS.rows)||'[]');state.mapping=JSON.parse(localStorage.getItem(LS.mapping)||'null')}catch{state.rows=[]}loadCompleted();loadRouteState();rebuildGroups();updateSummary();const s=getSettings();$('#defaultQty').value=s.defaultQty;$('#themePref').value=s.theme;$('#kevinEmail').value=s.kevinEmail||'';applyTheme(s.theme);syncSearchButton();renderCompleted();restoreRouteAfterGroups()}
 
 $('#excelFile').onchange=e=>{const f=e.target.files?.[0];if(f)importFile(f)};
 $('#reimportBtn').onclick=()=>$('#excelFile').click();
-$('#stationSearch').oninput=renderSuggestions;$('#clearStation').onclick=()=>{$('#stationSearch').value='';renderSuggestions()};$('#geoBtn').onclick=useGeo;$('#searchNearbyBtn').onclick=searchNearby;$('#radius').onchange=()=>state.start&&state.rows.length&&searchNearby();
+$('#stationSearch').oninput=renderSuggestions;$('#stationSearch').addEventListener('keydown',e=>{if(e.key!=='Enter')return;const a=searchPoi($('#stationSearch').value.trim());if(a.length){e.preventDefault();selectStart(a[0])}});$('#clearStation').onclick=()=>{$('#stationSearch').value='';renderSuggestions()};$('#geoBtn').onclick=useGeo;$('#searchNearbyBtn').onclick=searchNearby;$('#radius').onchange=()=>state.start&&state.rows.length&&state.poi.length&&searchNearby();
 $('#optimizeRouteBtn').onclick=optimizeRoute;$('#reoptimizeBtn').onclick=optimizeRoute;$('#clearRouteBtn').onclick=clearRoute;
 $('#copyShopping').onclick=async()=>{try{await navigator.clipboard.writeText(shoppingText());toast('Zekeringlijst gekopieerd')}catch{toast('Kopiëren niet gelukt')}};
 $('#copyCompleted').onclick=async()=>{try{await navigator.clipboard.writeText(completedText());toast('Uitgevoerd-overzicht gekopieerd')}catch{toast('Kopiëren niet gelukt')}};$('#completedFilter').onchange=renderCompleted;
 $('#settingsBtn').onclick=()=>{$('#settingsDlg').showModal()};document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>document.getElementById(b.dataset.close).close());
 $('#defaultQty').onchange=e=>{const n=Math.max(1,Math.min(12,Number(e.target.value)||3));e.target.value=n;saveSettings({defaultQty:n});if(state.routeFinalized){state.routeSnapshot=createShoppingSnapshot(routeOrderedGroups());saveRouteState();renderShoppingSnapshot()}renderCompleted()};
 $('#kevinEmail').onchange=e=>saveSettings({kevinEmail:e.target.value.trim()});$('#themePref').onchange=e=>{saveSettings({theme:e.target.value});applyTheme(e.target.value)};$('#themeBtn').onclick=()=>{const now=document.body.classList.contains('light')?'dark':'light';saveSettings({theme:now});$('#themePref').value=now;applyTheme(now)};
-$('#clearDataBtn').onclick=()=>{if(!confirm('Lokale werklijst op dit apparaat wissen? Je afgevinkte historie blijft bewaard.'))return;[LS.rows,LS.meta,LS.mapping].forEach(k=>localStorage.removeItem(k));state.rows=[];state.groups=[];state.nearbyCandidates=[];updateSummary();['resultsSection','routeBuilderSection','routeSection','actionsSection','engineeringSection','maintenanceSection','shoppingSection','unmatchedSection'].forEach(id=>$('#'+id)?.classList.add('hidden'));$('#settingsDlg').close();toast('Lokale werklijst gewist')};
+$('#clearDataBtn').onclick=()=>{if(!confirm('Lokale werklijst op dit apparaat wissen? Je afgevinkte historie blijft bewaard.'))return;[LS.rows,LS.meta,LS.mapping].forEach(k=>localStorage.removeItem(k));state.rows=[];state.groups=[];state.nearbyCandidates=[];updateSummary();syncSearchButton();['resultsSection','routeBuilderSection','routeSection','actionsSection','engineeringSection','maintenanceSection','shoppingSection','unmatchedSection'].forEach(id=>$('#'+id)?.classList.add('hidden'));$('#settingsDlg').close();toast('Lokale werklijst gewist')};
 $('#clearCompletedBtn').onclick=()=>{if(!confirm('Alle lokaal afgevinkte historie wissen?'))return;state.completed={};saveCompleted();rebuildGroups();updateSummary();renderCompleted();refreshVisibleData();toast('Afvinkhistorie gewist')};
 $('#clearSavedRouteBtn').onclick=()=>{if(!confirm('De opgeslagen route op dit apparaat wissen?'))return;clearSavedRoute()};
 $('#mappingBtn').onclick=()=>{openMapping();$('#settingsDlg').close()};$('#sheetSelect').onchange=e=>{const ws=state.workbook.getWorksheet(e.target.value);prepareMappingForSheet(ws,detectHeader(ws),null)};$('#headerRow').onchange=e=>{const ws=state.workbook.getWorksheet($('#sheetSelect').value);prepareMappingForSheet(ws,Number(e.target.value),null)};
