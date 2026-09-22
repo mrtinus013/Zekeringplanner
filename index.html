@@ -26,9 +26,9 @@
 
   <main>
     <section class="hero">
-      <div class="eyebrow"><span class="dot"></span> Werklijst + POI-locaties</div>
-      <h1>Plan open zekeringwissels rondom één station.</h1>
-      <p class="sub">De Excel blijft lokaal op dit apparaat. Kleuren, opmerkingen en gereedmeldingen worden automatisch herkend.</p>
+      <div class="eyebrow"><span class="dot"></span> Routeplanner + werklijst</div>
+      <h1>Kies eerst je stations. Maak daarna pas je route.</h1>
+      <p class="sub">Zoek open wissels in de omgeving, voeg de locaties toe die je vandaag wilt doen en laat de app daarna een logische rijvolgorde en zekeringlijst maken.</p>
 
       <div class="importbar">
         <label class="filebtn primary">
@@ -38,7 +38,6 @@
         <button id="reimportBtn" class="filebtn secondary hidden">↻ Andere Excel</button>
         <div id="fileInfo" class="fileinfo">Nog geen werklijst geladen</div>
       </div>
-
       <div id="summaryChips" class="chips hidden"></div>
     </section>
 
@@ -47,7 +46,7 @@
 
       <section class="panel start-panel">
         <div class="panel-head">
-          <div><span class="step">1</span><h2>Kies startstation</h2></div>
+          <div><span class="step">1</span><h2>Kies zoek-/startpunt</h2></div>
           <button id="geoBtn" class="smallbtn">◎ Mijn locatie</button>
         </div>
         <div class="searchbox">
@@ -60,54 +59,67 @@
       </section>
 
       <section class="panel controls-panel">
-        <div class="panel-head"><div><span class="step">2</span><h2>Omgeving</h2></div></div>
-        <div class="control-grid">
+        <div class="panel-head"><div><span class="step">2</span><h2>Zoek in de omgeving</h2></div></div>
+        <div class="control-grid one-control">
           <label>Straal
             <select id="radius">
               <option value="2">2 km</option><option value="5">5 km</option><option value="10" selected>10 km</option>
               <option value="15">15 km</option><option value="20">20 km</option><option value="30">30 km</option><option value="50">50 km</option>
             </select>
           </label>
-          <label>Max. stations
-            <select id="maxStations">
-              <option value="10">10</option><option value="20" selected>20</option><option value="30">30</option><option value="50">50</option><option value="999">Alles</option>
-            </select>
-          </label>
         </div>
-        <label class="toggle-row"><input id="includeAction" type="checkbox"><span></span><div><b>Gele regels toch opnieuw meenemen</b><small>Geel betekent: niet kunnen wisselen. Standaard apart tonen + mail Kevin.</small></div></label>
-        <button id="planBtn" class="planbtn" disabled>Maak lijst in de buurt</button>
+        <p class="note route-note">De afstand hier bepaalt alleen welke stations je kunt kiezen. De uiteindelijke route wordt daarna opnieuw geordend.</p>
+        <button id="searchNearbyBtn" class="planbtn" disabled>Zoek open stations</button>
       </section>
 
       <section id="resultsSection" class="panel hidden">
-        <div class="result-title"><div><span class="step">3</span><h2>Stations</h2></div><span id="resultCount" class="muted"></span></div>
+        <div class="result-title"><div><span class="step">3</span><h2>Kies stations voor je route</h2></div><span id="resultCount" class="muted"></span></div>
+        <p class="note">De lijst staat op afstand van je zoekpunt. Voeg alleen de locaties toe die je daadwerkelijk wilt meenemen in deze rit.</p>
         <div id="stationResults" class="station-list"></div>
+      </section>
+
+      <section id="routeBuilderSection" class="panel route-builder hidden">
+        <div class="route-builder-head">
+          <div><b id="routeDraftCount">0 locaties gekozen</b><small id="routeDraftHint">Voeg stations uit de lijst hierboven toe.</small></div>
+          <button id="clearRouteBtn" class="smallbtn">Wis route</button>
+        </div>
+        <div id="routeDraftChips" class="route-draft-chips"></div>
+        <button id="optimizeRouteBtn" class="planbtn" disabled>Maak logische rijvolgorde</button>
+      </section>
+
+      <section id="routeSection" class="panel hidden">
+        <div class="result-title route-title">
+          <div><span class="step">4</span><h2>Jouw route</h2></div>
+          <div class="route-head-actions"><button id="navigateNextBtn" class="smallbtn">↗ Volgende</button><button id="reoptimizeBtn" class="smallbtn">↻ Optimaliseer</button></div>
+        </div>
+        <div id="routeSummary" class="route-summary"></div>
+        <p class="note">De volgorde wordt berekend op basis van de geografische ligging en voorkomt onnodig zigzaggen. Het is geen live weg-/verkeersroutering; je navigatie-app bepaalt de echte weg naar iedere volgende stop.</p>
+        <div id="routeResults" class="route-list"></div>
+      </section>
+
+      <section id="shoppingSection" class="panel shopping hidden">
+        <div class="result-title"><div><span class="step">5</span><h2>Zekeringen meenemen</h2></div><button id="copyShopping" class="smallbtn">⧉ Kopieer</button></div>
+        <div id="shoppingList" class="shopping-list"></div>
+        <p id="shoppingNote" class="note"></p>
       </section>
 
       <section id="actionsSection" class="panel hidden">
         <div class="result-title"><div><span class="step action-step">!</span><h2>Actie nodig in de buurt</h2></div><span id="actionCount" class="muted"></span></div>
-        <p class="note"><b>Geel = niet kunnen wisselen.</b> De opmerking van jullie staat erbij. Vergeet niet Kevin te mailen; de app kan de mailtekst alvast maken.</p>
+        <p class="note"><b>Geel = niet kunnen wisselen.</b> De opmerking staat erbij. Vergeet niet Kevin te mailen.</p>
         <div id="actionResults" class="station-list"></div>
       </section>
 
-
       <section id="engineeringSection" class="panel hidden">
         <div class="result-title"><div><span class="step engineering-step">E</span><h2>Engineering</h2></div><span id="engineeringCount" class="muted"></span></div>
-        <p class="note">Oranje regels bevatten een Engineering-opmerking, meestal een verzwaring of vermindering. Ze worden niet automatisch in de boodschappenlijst meegenomen.</p>
+        <p class="note">Oranje regels bevatten een Engineering-opmerking, meestal een verzwaring of vermindering. Ze worden niet in jouw route of zekeringlijst meegenomen.</p>
         <div id="engineeringResults" class="station-list"></div>
       </section>
 
       <section id="maintenanceSection" class="panel hidden">
         <div class="result-title"><div><span class="step maintenance-step">H</span><h2>Onderhoud — Henri</h2></div><span id="maintenanceCount" class="muted"></span></div>
-        <p class="note">Blauwe regels worden door Henri van der Vleuten tijdens onderhoud opgepakt en blijven buiten jouw normale route en boodschappenlijst.</p>
+        <p class="note">Blauwe regels worden door Henri van der Vleuten tijdens onderhoud opgepakt.</p>
         <div id="maintenanceResults" class="station-list"></div>
       </section>
-
-      <section id="shoppingSection" class="panel shopping hidden">
-        <div class="result-title"><div><span class="step">4</span><h2>Boodschappenlijst</h2></div><button id="copyShopping" class="smallbtn">⧉ Kopieer</button></div>
-        <div id="shoppingList" class="shopping-list"></div>
-        <p id="shoppingNote" class="note"></p>
-      </section>
-
 
       <section id="completedSection" class="panel completed-panel">
         <div class="result-title"><div><span class="step completed-step">✓</span><h2>Uitgevoerd</h2><span id="completedCount" class="muted"></span></div><div class="completed-actions"><select id="completedFilter"><option value="today">Vandaag</option><option value="all">Alles</option></select><button id="copyCompleted" class="smallbtn">⧉ Kopieer</button></div></div>
@@ -134,7 +146,6 @@
     </label>
     <label>Kevin e-mailadres (optioneel)
       <input id="kevinEmail" type="email" autocomplete="email" placeholder="Vul in als je de mailknop direct wilt adresseren">
-      <small>Leeg laten kan ook; dan opent een nieuwe mail zonder ontvanger.</small>
     </label>
     <label>Weergave
       <select id="themePref"><option value="dark">Donker</option><option value="light">Licht</option><option value="system">Automatisch</option></select>
@@ -142,7 +153,8 @@
     <button id="mappingBtn" class="widebtn">Excel-kolommen aanpassen</button>
     <button id="clearDataBtn" class="widebtn danger">Lokale werklijst wissen</button>
     <button id="clearCompletedBtn" class="widebtn danger">Afvinkhistorie wissen</button>
-    <p class="version">Versie 0.3</p>
+    <button id="clearSavedRouteBtn" class="widebtn danger">Opgeslagen route wissen</button>
+    <p class="version">Versie 0.4</p>
   </dialog>
 
   <dialog id="mappingDlg">

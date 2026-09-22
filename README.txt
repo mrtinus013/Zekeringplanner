@@ -1,4 +1,4 @@
-ZEKERINGPLANNER v0.3
+ZEKERINGPLANNER v0.4
 ====================
 
 GitHub Pages-ready webapp voor de Enexis GFF-zekeringwissellijst.
